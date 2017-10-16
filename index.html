@@ -1,0 +1,120 @@
+<style>
+  body {
+    margin: 0px;
+    padding: 0px;
+  }
+  #frame {
+    position: absolute;
+    left: 0px;
+    top: 0px;
+  }
+</style>
+
+<video id="video" autoplay></video>
+<canvas id="canvas" width='0' height='0'></canvas>
+<canvas id="frame" width='0' height='0'></canvas>
+<br><button id="snap" class="sexyButton">Snap!</button>
+<br><textarea id='out' rows='10' cols='50'></textarea>
+
+<script src='https://cdn.rawgit.com/naptha/tesseract.js/1.0.10/dist/tesseract.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/camanjs/4.1.2/caman.full.min.js'></script>
+<script>
+
+  // draw red frame
+  video.addEventListener('loadeddata', function(){
+    // update w/h variables
+    window.frame = document.getElementById('frame');
+    var vw = frame.width = video.videoWidth;
+    var vh = frame.height = video.videoHeight;
+    window.fw = 270;
+    window.fh = 50;
+    window.fx = (vw-fw)/2;
+    window.fy = (vh-fh)/2;
+
+    // draw red rectagle
+    var ctx = frame.getContext('2d');
+    ctx.beginPath();
+    ctx.rect(fx, fy, fw, fh);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'red';
+    ctx.stroke();
+  });
+
+  // Put event listeners into place
+  // https://davidwalsh.name/browser-camera
+  window.addEventListener("DOMContentLoaded", function() {
+    // Grab elements, create settings, etc.
+    window.canvas = document.getElementById('canvas');
+    window.context = canvas.getContext('2d');
+    window.video = document.getElementById('video');
+    var mediaConfig =  { video: true };
+    var errBack = function(e) {
+      console.log('An error has occurred!', e)
+    };
+
+    // Put video listeners into place
+    if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia(mediaConfig).then(function(stream) {
+            video.src = window.URL.createObjectURL(stream);
+            video.play();
+        });
+    }
+    /* Legacy code below! */
+    else if(navigator.getUserMedia) { // Standard
+      navigator.getUserMedia(mediaConfig, function(stream) {
+        video.src = stream;
+        video.play();
+      }, errBack);
+    } else if(navigator.webkitGetUserMedia) { // WebKit-prefixed
+      navigator.webkitGetUserMedia(mediaConfig, function(stream){
+        video.src = window.webkitURL.createObjectURL(stream);
+        video.play();
+      }, errBack);
+    } else if(navigator.mozGetUserMedia) { // Mozilla-prefixed
+      navigator.mozGetUserMedia(mediaConfig, function(stream){
+        video.src = window.URL.createObjectURL(stream);
+        video.play();
+      }, errBack);
+    }
+
+  }, false);
+
+  // click snap button
+  var out = document.querySelector('#out');
+  document.getElementById('snap').addEventListener('click', function(){
+    out.value = 'Loading...';
+
+    // update canvas
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+
+    // process image before ocr
+    Caman('#canvas', function(){
+      this.brightness(10);
+      this.render(function(){
+        this.crop(fw, fh, fx, fy);
+        this.greyscale();
+        this.contrast(50);
+        this.sharpen(100);
+        this.render(function(){
+          canvas = document.querySelector('#canvas');
+          Tesseract.recognize(canvas, {
+            lang: 'eng',
+          }).then(function(result){
+            console.log(result)
+            out.value = result.text;
+          });
+        });
+      });
+    });
+
+    // unload video
+    frame.style.display = 'none';
+    video.style.display = 'none';
+    video.pause();
+    video.src = '';
+    video.load();
+  });
+
+</script>
